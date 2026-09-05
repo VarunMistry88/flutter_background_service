@@ -11,15 +11,26 @@ bool _isMainIsolate = true;
 
 @pragma('vm:entry-point')
 Future<void> entrypoint(List<String> args) async {
-  WidgetsFlutterBinding.ensureInitialized();
-  _isMainIsolate = false;
+  try {
+    WidgetsFlutterBinding.ensureInitialized();
+    _isMainIsolate = false;
 
-  final service = AndroidServiceInstance._();
-  final int handle = int.parse(args.first);
-  final callbackHandle = CallbackHandle.fromRawHandle(handle);
-  final onStart = PluginUtilities.getCallbackFromHandle(callbackHandle);
-  if (onStart != null) {
-    onStart(service);
+    final service = AndroidServiceInstance._();
+    if (args.isEmpty) {
+      debugPrint('[BackgroundService] ❌ No handle argument provided to entrypoint');
+      return;
+    }
+    final int handle = int.parse(args.first);
+    final callbackHandle = CallbackHandle.fromRawHandle(handle);
+    final onStart = PluginUtilities.getCallbackFromHandle(callbackHandle);
+    if (onStart != null) {
+      debugPrint('[BackgroundService] ✅ Executing onStart callback in background isolate');
+      onStart(service);
+    } else {
+      debugPrint('[BackgroundService] ❌ onStart callback not found from handle: $handle');
+    }
+  } catch (e, stack) {
+    debugPrint('[BackgroundService] ❌ Uncaught error in background entrypoint: $e\n$stack');
   }
 }
 

@@ -55,7 +55,7 @@ public class Config {
     }
 
     public String getInitialNotificationContent() {
-        return pref.getString("initial_notification_content", "Preparing");
+        return pref.getString("initial_notification_content", "Service active");
     }
 
     public void setInitialNotificationContent(String value) {
