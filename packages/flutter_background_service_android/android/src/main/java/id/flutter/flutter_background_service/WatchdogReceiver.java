@@ -13,10 +13,13 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Build;
 
+import android.util.Log;
+
 import androidx.core.app.AlarmManagerCompat;
 import androidx.core.content.ContextCompat;
 
 public class WatchdogReceiver extends BroadcastReceiver {
+    private static final String TAG = "WatchdogReceiver";
     private static final int QUEUE_REQUEST_ID = 111;
     private static final String ACTION_RESPAWN = "id.flutter.background_service.RESPAWN";
 
@@ -85,14 +88,17 @@ public class WatchdogReceiver extends BroadcastReceiver {
 
             if (!config.isManuallyStopped() && !isRunning) {
                 try {
+                    Log.d(TAG, "Watchdog respawning service (isForeground=" + config.isForeground() + ")");
                     if (config.isForeground()) {
                         ContextCompat.startForegroundService(context, new Intent(context, id.flutter.flutter_background_service.BackgroundService.class));
                     } else {
                         context.getApplicationContext().startService(new Intent(context, id.flutter.flutter_background_service.BackgroundService.class));
-                    }}
-                catch (Exception e){
-                    e.printStackTrace();
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "Watchdog failed to respawn service: " + e.getMessage(), e);
                 }
+            } else {
+                Log.d(TAG, "Watchdog skip respawn: isManuallyStopped=" + config.isManuallyStopped() + ", isRunning=" + isRunning);
             }
         }
     }

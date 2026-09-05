@@ -30,7 +30,10 @@ public class ForegroundTypeMapper {
         if (foregroundTypes != null && foregroundTypes.length > 0) {
             foregroundServiceType = 0;
             for (String foregroundType : foregroundTypes) {
-                foregroundServiceType |= foregroundTypeMap.get(foregroundType);
+                Integer type = foregroundTypeMap.get(foregroundType);
+                if (type != null) {
+                    foregroundServiceType |= type;
+                }
             }
         }
         return foregroundServiceType;
