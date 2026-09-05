@@ -38,7 +38,7 @@ class FlutterBackgroundServiceAndroid extends FlutterBackgroundServicePlatform {
   /// Registers this class as the default instance of [FlutterBackgroundServicePlatform].
   static void registerWith() {
     FlutterBackgroundServicePlatform.instance =
-        FlutterBackgroundServiceAndroid();
+        FlutterBackgroundServiceAndroid._();
   }
 
   FlutterBackgroundServiceAndroid._();
