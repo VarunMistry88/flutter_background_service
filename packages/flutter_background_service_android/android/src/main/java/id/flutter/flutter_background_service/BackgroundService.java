@@ -51,6 +51,7 @@ public class BackgroundService extends Service implements MethodChannel.MethodCa
     private Config config;
     private DartExecutor.DartEntrypoint dartEntrypoint;
     private boolean isManuallyStopped = false;
+    private boolean isForegroundStarted = false;
     private String notificationTitle;
     private String notificationContent;
     private String notificationChannelId;
@@ -163,6 +164,7 @@ public class BackgroundService extends Service implements MethodChannel.MethodCa
             config.setManuallyStopped(true);
         }
         stopForeground(true);
+        isForegroundStarted = false;
         isRunning.set(false);
 
         if (backgroundEngine != null) {
@@ -194,6 +196,9 @@ public class BackgroundService extends Service implements MethodChannel.MethodCa
             int importance = NotificationManager.IMPORTANCE_LOW;
             NotificationChannel channel = new NotificationChannel(notificationChannelId, name, importance);
             channel.setDescription(description);
+            channel.setSound(null, null);
+            channel.enableVibration(false);
+            channel.setShowBadge(false);
 
             NotificationManager notificationManager = getSystemService(NotificationManager.class);
             notificationManager.createNotificationChannel(channel);
@@ -201,7 +206,11 @@ public class BackgroundService extends Service implements MethodChannel.MethodCa
     }
 
     protected void updateNotificationInfo() {
-        Log.d(TAG, "updateNotificationInfo() - isForeground: " + config.isForeground() + ", title: '" + notificationTitle + "', content: '" + notificationContent + "'");
+        updateNotificationInfo(true);
+    }
+
+    protected void updateNotificationInfo(boolean promoteToForeground) {
+        Log.d(TAG, "updateNotificationInfo(promoteToForeground=" + promoteToForeground + ") - isForeground: " + config.isForeground() + ", title: '" + notificationTitle + "', content: '" + notificationContent + "'");
         if (config.isForeground()) {
             String packageName = getApplicationContext().getPackageName();
             Intent i = getPackageManager().getLaunchIntentForPackage(packageName);
@@ -216,11 +225,24 @@ public class BackgroundService extends Service implements MethodChannel.MethodCa
                     .setSmallIcon(R.drawable.ic_bg_service_small)
                     .setAutoCancel(true)
                     .setOngoing(true)
+                    .setOnlyAlertOnce(true)
+                    .setSilent(true)
+                    .setPriority(NotificationCompat.PRIORITY_LOW)
+                    .setCategory(NotificationCompat.CATEGORY_SERVICE)
                     .setContentTitle(notificationTitle)
                     .setContentText(notificationContent)
                     .setContentIntent(pi);
 
             try {
+                if (!promoteToForeground && isForegroundStarted) {
+                    NotificationManager notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+                    if (notificationManager != null) {
+                        notificationManager.notify(notificationId, mBuilder.build());
+                        Log.i(TAG, "✅ NotificationManager.notify succeeded silently! Notification active: ['" + notificationTitle + "' : '" + notificationContent + "']");
+                        return;
+                    }
+                }
+
                 foregroundTypes = null;
                 if (configForegroundTypes != null && !configForegroundTypes.isEmpty()) {
                     foregroundTypes = configForegroundTypes.split(",");
@@ -228,6 +250,7 @@ public class BackgroundService extends Service implements MethodChannel.MethodCa
                 Integer serviceType = ForegroundTypeMapper.getForegroundServiceType(foregroundTypes);
                 Log.d(TAG, "Attempting ServiceCompat.startForeground(id=" + notificationId + ", serviceType=" + serviceType + ")...");
                 ServiceCompat.startForeground(this, notificationId, mBuilder.build(), serviceType);
+                isForegroundStarted = true;
                 Log.i(TAG, "✅ ServiceCompat.startForeground succeeded! Notification active: ['" + notificationTitle + "' : '" + notificationContent + "']");
             } catch (SecurityException e) {
                 Log.e(TAG, "❌ CRITICAL: SecurityException in startForeground! " + e.getMessage(), e);
@@ -355,7 +378,7 @@ public class BackgroundService extends Service implements MethodChannel.MethodCa
                     notificationTitle = arg.getString("title");
                     notificationContent = arg.getString("content");
                     Log.i(TAG, "Updating notification info: ['" + oldTitle + "' -> '" + notificationTitle + "'], ['" + oldContent + "' -> '" + notificationContent + "']");
-                    updateNotificationInfo();
+                    updateNotificationInfo(false);
                     result.success(true);
                 } else {
                     Log.w(TAG, "setNotificationInfo payload missing 'title' key");
@@ -376,10 +399,11 @@ public class BackgroundService extends Service implements MethodChannel.MethodCa
                 boolean value = arg.getBoolean("value");
                 config.setIsForeground(value);
                 if (value) {
-                    updateNotificationInfo();
+                    updateNotificationInfo(true);
                     backgroundEngine.getServiceControlSurface().onMoveToForeground();
                 } else {
                     stopForeground(true);
+                    isForegroundStarted = false;
                     backgroundEngine.getServiceControlSurface().onMoveToBackground();
                 }
 
